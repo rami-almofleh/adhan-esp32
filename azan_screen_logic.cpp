@@ -12,6 +12,37 @@ static bool adhanStarted = false;
 // merken welches Gebet gerade läuft
 static String currentPrayerName = "";
 
+namespace {
+
+AudioFileSourceSD* openAdhanFile() {
+  static const char* adhanCandidates[][4] = {
+      {"/adhan1.mp3", "/adhan_1.mp3", "/adhan.mp3", "adhan.mp3"},
+      {"/adhan2.mp3", "/adhan_2.mp3", "/adhan.mp3", "adhan.mp3"},
+      {"/adhan3.mp3", "/adhan_3.mp3", "/adhan.mp3", "adhan.mp3"}};
+
+  uint8_t soundIndex = appSettings.adhanSoundIndex;
+  if (soundIndex > 2) {
+    soundIndex = 0;
+  }
+
+  for (uint8_t i = 0; i < 4; i++) {
+    AudioFileSourceSD* candidate = new AudioFileSourceSD(adhanCandidates[soundIndex][i]);
+    if (candidate && candidate->isOpen()) {
+      Serial.printf("Adhan Datei: %s\n", adhanCandidates[soundIndex][i]);
+      return candidate;
+    }
+    delete candidate;
+  }
+
+  return nullptr;
+}
+
+Screen getReturnScreen() {
+  return screenBeforeAzan == SCREEN_AZAN ? SCREEN_HOME : screenBeforeAzan;
+}
+
+}  // namespace
+
 // -------------------------
 // INIT
 // -------------------------
@@ -40,7 +71,11 @@ void azan_screen_loop() {
 
   if (!adhanStarted) {
     startAdhan();
-    adhanStarted = true;
+    adhanStarted = isPlaying;
+    if (!adhanStarted) {
+      changeScreen(getReturnScreen());
+      return;
+    }
   }
 
   handleAudioTick();
@@ -63,15 +98,7 @@ void startAdhan() {
     lv_label_set_text(ui_AzanScreen_Label_Label8, "Tippen zum Stoppen");
   }
 
-  const char* testFiles[] = { "/adhan.mp3", "adhan.mp3" };
-
-  file = nullptr;
-  for (int i = 0; i < 2; i++) {
-    file = new AudioFileSourceSD(testFiles[i]);
-    if (file && file->isOpen()) break;
-    if (file) delete file;
-    file = nullptr;
-  }
+  file = openAdhanFile();
 
   if (!file) {
     Serial.println("Keine Datei gefunden!");
@@ -85,6 +112,10 @@ void startAdhan() {
     Serial.println("Adhan läuft!");
   } else {
     Serial.println("MP3 Start fehlgeschlagen");
+    delete mp3;
+    mp3 = nullptr;
+    delete file;
+    file = nullptr;
   }
 }
 
@@ -108,8 +139,7 @@ void stopAdhan() {
   isPlaying = false;
   adhanStarted = false;
 
-  // RICHTIGER SCREEN WECHSEL
-  changeScreen(SCREEN_HOME);
+  changeScreen(getReturnScreen());
 }
 
 // -------------------------

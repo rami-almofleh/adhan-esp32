@@ -109,7 +109,7 @@ void initAudio() {
   out->SetPinout(32, 25, 21);
   // out->SetPinout(25, 26, 22);
   out->begin();
-  out->SetGain(0.6);
+  out->SetGain(appSettings.volumeLevel / 10.0f);
 }
 
 void initSD() {

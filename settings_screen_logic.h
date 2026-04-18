@@ -5,6 +5,8 @@ void reset_app(lv_event_t* e);
 
 void settings_screen_init();
 void settings_screen_loop();
+void load_settings();
+void apply_settings();
 
 // Neue Funktionen für Lautstärkeänderung
 void volume_increase(lv_event_t* e);  // Lautstärke erhöhen

@@ -2,6 +2,7 @@
 #include "ui.h"
 
 Screen currentScreen = SCREEN_START;
+Screen screenBeforeAzan = SCREEN_HOME;
 SystemStatus currentStatus = ST_START;
 
 Prayer prayers[] = {
@@ -15,6 +16,7 @@ struct tm globalTime;
 bool timeValid = false;
 bool isPlaying = false;
 bool sdCardOk = false;
+AppSettings appSettings = {6, false, 0};
 AudioGeneratorMP3* mp3 = nullptr;
 AudioFileSourceSD* file = nullptr;
 AudioOutputI2S* out = nullptr;
@@ -29,6 +31,10 @@ const uint8_t SD_CS = 5;
 const uint8_t TFT_H_CS = 15;
 
 void changeScreen(Screen newScreen) {
+  if (newScreen == SCREEN_AZAN && currentScreen != SCREEN_AZAN) {
+    screenBeforeAzan = currentScreen;
+  }
+
   switch (newScreen) {
     case SCREEN_HOME:
       lv_scr_load_anim(ui_Screen_HomeScreen, LV_SCR_LOAD_ANIM_FADE_ON, 300, 0, false);

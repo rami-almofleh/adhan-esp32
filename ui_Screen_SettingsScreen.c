@@ -186,7 +186,7 @@ ui_object_set_themeable_style_property(ui_SettingsScreen_Label_Label7, LV_PART_M
 lv_obj_set_style_text_font(ui_SettingsScreen_Label_Label7, &lv_font_montserrat_24, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 
-lv_obj_t * ui_SettingsScreen_Switch_Theme_Label = lv_label_create(ui_SettingsScreen_Container_Container11);
+ui_SettingsScreen_Switch_Theme_Label = lv_label_create(ui_SettingsScreen_Container_Container11);
 lv_label_set_text(ui_SettingsScreen_Switch_Theme_Label, "Theme:");
 lv_obj_align(ui_SettingsScreen_Switch_Theme_Label, LV_ALIGN_LEFT_MID, -10, 0);
 lv_obj_clear_flag(ui_SettingsScreen_Switch_Theme_Label, LV_OBJ_FLAG_HIDDEN);

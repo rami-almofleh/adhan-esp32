@@ -130,7 +130,9 @@ void setup() {
   lv_init();
   init_disp_driver();
 
+  load_settings();
   ui_init();
+  apply_settings();
 
   start_screen_init();
 
@@ -148,6 +150,10 @@ void loop() {
   if (millis() - lastTimeUpdate >= 1000) {
     lastTimeUpdate = millis();
     updateTime();
+    updateStatusIcons();
+    if (currentStatus == ST_RUNNING) {
+      checkAdhanLogic();
+    }
   }
 
   switch (currentScreen) {

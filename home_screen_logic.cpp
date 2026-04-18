@@ -13,6 +13,7 @@
 static bool initialized = false;
 static long nextDiff = 0;
 static int lastTriggeredPrayer = -1;
+static int lastTriggerDayOfYear = -1;
 static unsigned long lastDayCheck = 0;
 static int lastSec = -1;
 static long lastDiff = -1;
@@ -33,10 +34,11 @@ void home_screen_init() {
   lv_obj_add_event_cb(ui_HomeScreen_Button_SettingsButton, go_to_settings_screen, LV_EVENT_CLICKED, NULL);
 
   // Initiale Daten anzeigen
-  drawClock();        // Uhr anzeigen
-  drawNextPrayer();   // Nächste Gebetszeit anzeigen
-  checkAdhanLogic();  // Gebetszeit-Logik überprüfen
-  drawDate();         // Datum anzeigen
+  if (timeValid) {
+    drawClock();
+    drawNextPrayer();
+    drawDate();
+  }
 
   playHomeTone();
 
@@ -51,24 +53,19 @@ void home_screen_init() {
 // Initialize WLAN & SD Icons
 // -------------------------
 void updateStatusIcons() {
+  if (ui_HomeScreen_Label_WLANStateLabel == NULL || ui_HomeScreen_Label_SDStateLabel == NULL) return;
   setIconColor(ui_HomeScreen_Label_WLANStateLabel, WiFi.status() == WL_CONNECTED);
   setIconColor(ui_HomeScreen_Label_SDStateLabel, sdCardOk);
 }
 
 void setIconColor(lv_obj_t* label, bool active) {
-  if (active) {
-    ui_object_set_themeable_style_property(
+  if (label == NULL) return;
+
+  lv_obj_set_style_text_color(
       label,
-      LV_PART_MAIN | LV_STATE_DEFAULT,
-      LV_STYLE_TEXT_COLOR,
-      _ui_theme_color_primary);
-  } else {
-    ui_object_set_themeable_style_property(
-      label,
-      LV_PART_MAIN | LV_STATE_DEFAULT,
-      LV_STYLE_TEXT_COLOR,
-      _ui_theme_color_gray);
-  }
+      active ? lv_color_hex(0x2DA041) : lv_color_hex(0xBBBBBB),
+      LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_invalidate(label);
 }
 
 // -------------------------
@@ -88,7 +85,7 @@ void go_to_settings_screen(lv_event_t* e) {
 // Home Screen Loop
 // -------------------------
 void home_screen_loop() {
-  if (ui_Screen_HomeScreen == NULL || !timeValid) return;
+  if (ui_Screen_HomeScreen == NULL) return;
 
   handleHomeToneTick();
 
@@ -98,12 +95,7 @@ void home_screen_loop() {
 
   // Check if the screen is currently active
   if (lv_scr_act() != ui_Screen_HomeScreen) return;
-
-  static unsigned long lastStatusCheck = 0;
-  if (lv_scr_act() == ui_Screen_HomeScreen && millis() - lastStatusCheck > 4000) {
-    lastStatusCheck = millis();
-    updateStatusIcons();
-  }
+  if (!timeValid) return;
 
   static unsigned long last1s = 0;
   if (millis() - last1s >= 1000) {
@@ -111,7 +103,6 @@ void home_screen_loop() {
 
     drawClock();
     drawNextPrayer();
-    checkAdhanLogic();
   }
 
   // Datum einmal pro Minute
@@ -129,6 +120,13 @@ void checkAdhanLogic() {
   if (millis() - lastCheck < 1000) return;
   lastCheck = millis();
 
+  if (!timeValid) return;
+
+  if (lastTriggerDayOfYear != globalTime.tm_yday) {
+    lastTriggerDayOfYear = globalTime.tm_yday;
+    lastTriggeredPrayer = -1;
+  }
+
   long now = globalTime.tm_hour * 3600 + globalTime.tm_min * 60 + globalTime.tm_sec;
 
   for (int i = 0; i < 5; i++) {
@@ -139,7 +137,7 @@ void checkAdhanLogic() {
       Serial.printf("ADHAN ZEIT! Es ist %s (%s)\n", prayers[i].name.c_str(), prayers[i].time.c_str());
 
       if (!isPlaying) {
-        calculateNextPrayer();
+        nextPrayerIndex = i;
         changeScreen(SCREEN_AZAN);
       }
     }

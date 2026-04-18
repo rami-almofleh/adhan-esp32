@@ -21,6 +21,12 @@ enum B_Hardware {
   H_SD
 };
 
+struct AppSettings {
+  uint8_t volumeLevel;
+  bool darkMode;
+  uint8_t adhanSoundIndex;
+};
+
 struct Prayer {
   String name;
   String time;
@@ -31,10 +37,12 @@ extern bool isPlaying;
 extern bool sdCardOk;
 extern SystemStatus currentStatus;
 extern Screen currentScreen;
+extern Screen screenBeforeAzan;
 extern Prayer prayers[5];
 extern int nextPrayerIndex;
 extern struct tm globalTime;
 extern bool timeValid;
+extern AppSettings appSettings;
 extern AudioOutputI2S* out;
 extern AudioGeneratorMP3* mp3;
 extern AudioFileSourceSD* file;
