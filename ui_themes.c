@@ -8,16 +8,16 @@
 const ui_theme_variable_t _ui_theme_color_primary[3] = {0x2DA041, 0xC9A227, 0x2DA041};
 const ui_theme_variable_t _ui_theme_alpha_primary[3] = {255, 255, 255};
 
-const ui_theme_variable_t _ui_theme_color_secondary[3] = {0x80C78C, 0xFFFAE9, 0x80C78C};
+const ui_theme_variable_t _ui_theme_color_secondary[3] = {0xE5F3E8, 0x2B2518, 0xE5F3E8};
 const ui_theme_variable_t _ui_theme_alpha_secondary[3] = {255, 255, 255};
 
-const ui_theme_variable_t _ui_theme_color_background[3] = {0xFFFFFF, 0x000000, 0xFFFFFF};
+const ui_theme_variable_t _ui_theme_color_background[3] = {0xF7FBF8, 0x101412, 0xF7FBF8};
 const ui_theme_variable_t _ui_theme_alpha_background[3] = {255, 255, 255};
 
-const ui_theme_variable_t _ui_theme_color_gray[3] = {0xBBBBBB, 0xBBBBBB, 0xBBBBBB};
+const ui_theme_variable_t _ui_theme_color_gray[3] = {0xA5B0A8, 0x657067, 0xA5B0A8};
 const ui_theme_variable_t _ui_theme_alpha_gray[3] = {255, 255, 255};
 
-const ui_theme_variable_t _ui_theme_color_title[3] = {0x000000, 0xFFFFFF, 0x000000};
+const ui_theme_variable_t _ui_theme_color_title[3] = {0x102018, 0xF4F6F3, 0x102018};
 const ui_theme_variable_t _ui_theme_alpha_title[3] = {255, 255, 255};
 uint8_t ui_theme_idx = UI_THEME_LIGHT;
 

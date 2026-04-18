@@ -1,69 +1,87 @@
 #include "azan_screen_logic.h"
+
 #include "app_state.h"
+#include "azan_screen_ui.h"
 #include "ui.h"
-#include <SD.h>
+
 #include <AudioFileSourceSD.h>
 #include <AudioGeneratorMP3.h>
 #include <AudioOutputI2S.h>
+#include <SD.h>
 
 static bool initialized = false;
 static bool adhanStarted = false;
 
-// merken welches Gebet gerade läuft
-static String currentPrayerName = "";
-
 namespace {
 
-AudioFileSourceSD* openAdhanFile() {
-  static const char* adhanCandidates[][4] = {
-      {"/adhan1.mp3", "/adhan_1.mp3", "/adhan.mp3", "adhan.mp3"},
-      {"/adhan2.mp3", "/adhan_2.mp3", "/adhan.mp3", "adhan.mp3"},
-      {"/adhan3.mp3", "/adhan_3.mp3", "/adhan.mp3", "adhan.mp3"}};
-
-  uint8_t soundIndex = appSettings.adhanSoundIndex;
-  if (soundIndex > 2) {
-    soundIndex = 0;
+AudioFileSourceSD* try_open(const char* path) {
+  AudioFileSourceSD* candidate = new AudioFileSourceSD(path);
+  if (candidate && candidate->isOpen()) {
+    Serial.printf("Adhan: verwende %s\n", path);
+    return candidate;
   }
-
-  for (uint8_t i = 0; i < 4; i++) {
-    AudioFileSourceSD* candidate = new AudioFileSourceSD(adhanCandidates[soundIndex][i]);
-    if (candidate && candidate->isOpen()) {
-      Serial.printf("Adhan Datei: %s\n", adhanCandidates[soundIndex][i]);
-      return candidate;
-    }
-    delete candidate;
-  }
-
+  delete candidate;
   return nullptr;
 }
 
-Screen getReturnScreen() {
+AudioFileSourceSD* open_adhan_file() {
+  if (appSettings.adhanSoundFile.length() > 0) {
+    AudioFileSourceSD* selected = try_open(appSettings.adhanSoundFile.c_str());
+    if (selected) {
+      return selected;
+    }
+
+    String selected_path = appSettings.adhanSoundFile;
+    int slash_pos = selected_path.lastIndexOf('/');
+    String file_name = slash_pos >= 0 ? selected_path.substring(slash_pos + 1) : selected_path;
+    const String selected_fallbacks[] = {
+        String("/Adhan/") + file_name,
+        String("/adhan/") + file_name,
+        String("/") + file_name,
+        file_name};
+
+    for (const String& candidate_path : selected_fallbacks) {
+      selected = try_open(candidate_path.c_str());
+      if (selected) {
+        return selected;
+      }
+    }
+  }
+
+  static const char* fallbackFiles[] = {
+      "/Adhan/adhan.mp3",
+      "/adhan/adhan.mp3",
+      "/adhan.mp3",
+      "adhan.mp3"};
+
+  for (uint8_t i = 0; i < 4; i++) {
+    AudioFileSourceSD* candidate = try_open(fallbackFiles[i]);
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  Serial.println("Adhan: keine Audio-Datei gefunden");
+  return nullptr;
+}
+
+Screen get_return_screen() {
   return screenBeforeAzan == SCREEN_AZAN ? SCREEN_HOME : screenBeforeAzan;
+}
+
+void stop_click_handler(lv_event_t* e) {
+  LV_UNUSED(e);
+  stopAdhan();
 }
 
 }  // namespace
 
-// -------------------------
-// INIT
-// -------------------------
 void azan_screen_init() {
   if (initialized) return;
-
-  if (ui_Screen_AzanScreen == NULL) return;
-
-  // kompletter Screen klickbar
-  lv_obj_add_flag(ui_Screen_AzanScreen, LV_OBJ_FLAG_CLICKABLE);
-
-  lv_obj_add_event_cb(ui_Screen_AzanScreen, [](lv_event_t* e) {
-    stopAdhan();
-  }, LV_EVENT_CLICKED, NULL);
-
+  azan_screen_ui_init(stop_click_handler);
   initialized = true;
 }
 
-// -------------------------
-// LOOP
-// -------------------------
 void azan_screen_loop() {
   if (!initialized) {
     azan_screen_init();
@@ -73,7 +91,7 @@ void azan_screen_loop() {
     startAdhan();
     adhanStarted = isPlaying;
     if (!adhanStarted) {
-      changeScreen(getReturnScreen());
+      changeScreen(get_return_screen());
       return;
     }
   }
@@ -81,37 +99,20 @@ void azan_screen_loop() {
   handleAudioTick();
 }
 
-// -------------------------
-// START ADHAN
-// -------------------------
 void startAdhan() {
-  Serial.println("Starte Adhan...");
+  azan_screen_ui_set_prayer_title(prayers[nextPrayerIndex].name.c_str());
+  azan_screen_ui_set_hint("Tippen zum Stoppen");
 
-  currentPrayerName = prayers[nextPrayerIndex].name;
-
-  // ✅ RICHTIGE LABELS
-  if (ui_AzanScreen_Label_PrayerTitle != NULL) {
-    lv_label_set_text(ui_AzanScreen_Label_PrayerTitle, currentPrayerName.c_str());
-  }
-
-  if (ui_AzanScreen_Label_Label8 != NULL) {
-    lv_label_set_text(ui_AzanScreen_Label_Label8, "Tippen zum Stoppen");
-  }
-
-  file = openAdhanFile();
-
+  file = open_adhan_file();
   if (!file) {
-    Serial.println("Keine Datei gefunden!");
     return;
   }
 
   mp3 = new AudioGeneratorMP3();
-
   if (mp3->begin(file, out)) {
     isPlaying = true;
-    Serial.println("Adhan läuft!");
   } else {
-    Serial.println("MP3 Start fehlgeschlagen");
+    Serial.println("Adhan: MP3 Start fehlgeschlagen");
     delete mp3;
     mp3 = nullptr;
     delete file;
@@ -119,12 +120,7 @@ void startAdhan() {
   }
 }
 
-// -------------------------
-// STOP ADHAN
-// -------------------------
 void stopAdhan() {
-  Serial.println("Stoppe Adhan");
-
   if (mp3) {
     mp3->stop();
     delete mp3;
@@ -138,18 +134,13 @@ void stopAdhan() {
 
   isPlaying = false;
   adhanStarted = false;
-
-  changeScreen(getReturnScreen());
+  changeScreen(get_return_screen());
 }
 
-// -------------------------
-// AUDIO LOOP
-// -------------------------
 void handleAudioTick() {
   if (isPlaying && mp3 && mp3->isRunning()) {
-
     if (!mp3->loop()) {
-      stopAdhan(); // 👉 automatisch zurück
+      stopAdhan();
     }
   }
 }

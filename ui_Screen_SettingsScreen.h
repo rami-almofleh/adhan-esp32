@@ -28,8 +28,13 @@ extern lv_obj_t *ui_SettingsScreen_Label_Label9;
 extern lv_obj_t *ui_SettingsScreen_Label_SoundLevelLabel;
 extern lv_obj_t *ui_SettingsScreen_Button_SoundPlusButton1;
 extern lv_obj_t *ui_SettingsScreen_Label_Label7;
+extern lv_obj_t *ui_SettingsScreen_Container_ThemeRow;
 extern lv_obj_t *ui_SettingsScreen_Switch_Theme;
 extern lv_obj_t *ui_SettingsScreen_Switch_Theme_Label;
+extern lv_obj_t *ui_SettingsScreen_Container_AdhanRow;
+extern lv_obj_t *ui_SettingsScreen_Label_AdhanLabel;
+extern lv_obj_t *ui_SettingsScreen_Button_AdhanChangeButton;
+extern lv_obj_t *ui_SettingsScreen_Label_AdhanChangeLabel;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus
@@ -37,4 +42,3 @@ extern lv_obj_t *ui_SettingsScreen_Switch_Theme_Label;
 #endif
 
 #endif
-

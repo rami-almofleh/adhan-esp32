@@ -12,7 +12,8 @@ enum Screen {
   SCREEN_HOME,
   SCREEN_PRAYERS,
   SCREEN_SETTINGS,
-  SCREEN_AZAN
+  SCREEN_AZAN,
+  SCREEN_ADHAN_SELECT
 };
 
 enum B_Hardware {
@@ -24,7 +25,7 @@ enum B_Hardware {
 struct AppSettings {
   uint8_t volumeLevel;
   bool darkMode;
-  uint8_t adhanSoundIndex;
+  String adhanSoundFile;
 };
 
 struct Prayer {

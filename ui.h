@@ -35,6 +35,7 @@ extern "C" {
 #include "ui_Screen_PrayersScreen.h"
 #include "ui_Screen_SettingsScreen.h"
 #include "ui_Screen_AzanScreen.h"
+#include "ui_Screen_AdhanSelectScreen.h"
 
 ///////////////////// VARIABLES ////////////////////
 

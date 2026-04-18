@@ -38,6 +38,7 @@ ui_Screen_HomeScreen_screen_init();
 ui_Screen_PrayersScreen_screen_init();
 ui_Screen_SettingsScreen_screen_init();
 ui_Screen_AzanScreen_screen_init();
+ui_Screen_AdhanSelectScreen_screen_init();
 ui_Startevents____initial_actions0 = lv_obj_create(NULL);
 lv_disp_load_scr( ui_Screen_StartScreen);
 }
@@ -48,4 +49,5 @@ ui_Screen_HomeScreen_screen_destroy();
 ui_Screen_PrayersScreen_screen_destroy();
 ui_Screen_SettingsScreen_screen_destroy();
 ui_Screen_AzanScreen_screen_destroy();
+ui_Screen_AdhanSelectScreen_screen_destroy();
 }

@@ -2,13 +2,15 @@
 
 #include "app_state.h"
 #include "home_screen_logic.h"
+#include "settings_screen_ui.h"
 #include "ui.h"
 
-#include <Preferences.h>
-#include <SD.h>
 #include <AudioFileSourceSD.h>
 #include <AudioGeneratorMP3.h>
 #include <AudioOutputI2S.h>
+#include <FS.h>
+#include <Preferences.h>
+#include <SD.h>
 #include <esp_system.h>
 
 extern AudioOutputI2S* out;
@@ -17,216 +19,236 @@ namespace {
 
 constexpr uint8_t kMinVolume = 0;
 constexpr uint8_t kMaxVolume = 10;
-constexpr uint8_t kMaxAdhanSoundIndex = 2;
+constexpr size_t kMaxAdhanFiles = 24;
 constexpr char kPrefsNamespace[] = "mawaqit";
+
+struct AdhanOption {
+  String filePath;
+  String displayName;
+};
 
 Preferences preferences;
 bool initialized = false;
-bool syncingUi = false;
+bool adhanFilesLoaded = false;
+bool previewActive = false;
+int previewOptionIndex = -1;
+AdhanOption adhanOptions[kMaxAdhanFiles];
+size_t adhanOptionCount = 0;
 
-lv_obj_t* themeRow = nullptr;
-lv_obj_t* adhanRow = nullptr;
-lv_obj_t* adhanLabel = nullptr;
-lv_obj_t* adhanDropdown = nullptr;
+AudioFileSourceSD* open_audio_file(const char* file_path) {
+  if (file_path == nullptr || file_path[0] == '\0') {
+    Serial.println("Audio: leerer Dateipfad");
+    return nullptr;
+  }
 
-lv_obj_t* create_settings_row(lv_obj_t* parent) {
-  lv_obj_t* row = lv_obj_create(parent);
-  lv_obj_remove_style_all(row);
-  lv_obj_set_width(row, lv_pct(100));
-  lv_obj_set_height(row, LV_SIZE_CONTENT);
-  lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-  lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_clear_flag(row, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_pad_left(row, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
-  lv_obj_set_style_pad_right(row, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
-  lv_obj_set_style_pad_top(row, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
-  lv_obj_set_style_pad_bottom(row, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
-  lv_obj_set_style_pad_column(row, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
-  return row;
+  AudioFileSourceSD* source = new AudioFileSourceSD(file_path);
+  if (source && source->isOpen()) {
+    Serial.printf("Audio: verwende %s\n", file_path);
+    return source;
+  }
+  delete source;
+
+  String path(file_path);
+  int slash_pos = path.lastIndexOf('/');
+  String file_name = slash_pos >= 0 ? path.substring(slash_pos + 1) : path;
+  const String fallbacks[] = {
+      String("/Adhan/") + file_name,
+      String("/adhan/") + file_name,
+      String("/") + file_name,
+      file_name};
+
+  for (const String& candidate : fallbacks) {
+    source = new AudioFileSourceSD(candidate.c_str());
+    if (source && source->isOpen()) {
+      Serial.printf("Audio: Fallback %s\n", candidate.c_str());
+      return source;
+    }
+    delete source;
+  }
+
+  Serial.printf("Audio: Datei nicht gefunden %s\n", file_path);
+  return nullptr;
+}
+
+String sanitize_display_name(const String& file_name) {
+  String base = file_name;
+  int slash_pos = base.lastIndexOf('/');
+  if (slash_pos >= 0) base = base.substring(slash_pos + 1);
+
+  String lower = base;
+  lower.toLowerCase();
+  if (lower.endsWith(".mp3")) {
+    base.remove(base.length() - 4);
+  }
+  return base;
+}
+
+bool is_mp3_file(const String& file_name) {
+  String lower = file_name;
+  lower.toLowerCase();
+  return lower.endsWith(".mp3");
+}
+
+void clear_adhan_options() {
+  for (size_t i = 0; i < adhanOptionCount; i++) {
+    adhanOptions[i].filePath = "";
+    adhanOptions[i].displayName = "";
+  }
+  adhanOptionCount = 0;
+}
+
+void sort_adhan_options() {
+  for (size_t i = 0; i < adhanOptionCount; i++) {
+    for (size_t j = i + 1; j < adhanOptionCount; j++) {
+      String left = adhanOptions[i].displayName;
+      String right = adhanOptions[j].displayName;
+      left.toLowerCase();
+      right.toLowerCase();
+      if (right < left) {
+        AdhanOption tmp = adhanOptions[i];
+        adhanOptions[i] = adhanOptions[j];
+        adhanOptions[j] = tmp;
+      }
+    }
+  }
+}
+
+bool load_adhan_directory(const char* folder_path) {
+  File dir = SD.open(folder_path);
+  if (!dir || !dir.isDirectory()) {
+    if (dir) dir.close();
+    return false;
+  }
+
+  File entry = dir.openNextFile();
+  while (entry && adhanOptionCount < kMaxAdhanFiles) {
+    if (!entry.isDirectory()) {
+      String name = entry.name();
+      if (is_mp3_file(name)) {
+        int slash_pos = name.lastIndexOf('/');
+        String base_name = slash_pos >= 0 ? name.substring(slash_pos + 1) : name;
+        adhanOptions[adhanOptionCount].filePath = String(folder_path) + "/" + base_name;
+        adhanOptions[adhanOptionCount].displayName = sanitize_display_name(base_name);
+        adhanOptionCount++;
+      }
+    }
+    entry.close();
+    entry = dir.openNextFile();
+  }
+
+  dir.close();
+  return adhanOptionCount > 0;
 }
 
 void save_settings() {
-  if (!preferences.begin(kPrefsNamespace, false)) {
-    Serial.println("Preferences konnten nicht geoeffnet werden");
-    return;
-  }
-
+  if (!preferences.begin(kPrefsNamespace, false)) return;
   preferences.putUChar("volume", appSettings.volumeLevel);
   preferences.putBool("dark", appSettings.darkMode);
-  preferences.putUChar("adhan", appSettings.adhanSoundIndex);
+  preferences.putString("adhan_file", appSettings.adhanSoundFile.c_str());
   preferences.end();
 }
 
-void update_theme_label() {
-  if (ui_SettingsScreen_Switch_Theme_Label == nullptr) {
-    return;
+void stop_preview_audio_internal() {
+  if (mp3Tone) {
+    mp3Tone->stop();
+    delete mp3Tone;
+    mp3Tone = nullptr;
   }
-
-  lv_label_set_text(
-      ui_SettingsScreen_Switch_Theme_Label,
-      appSettings.darkMode ? "Theme: Dunkel" : "Theme: Hell");
-  lv_obj_invalidate(ui_SettingsScreen_Switch_Theme_Label);
+  if (toneFile) {
+    delete toneFile;
+    toneFile = nullptr;
+  }
+  previewActive = false;
+  previewOptionIndex = -1;
 }
 
-void restyle_dropdown() {
-  if (adhanDropdown == nullptr) {
-    return;
+bool start_audio_file(const char* file_path, int option_index) {
+  if (!sdCardOk || out == nullptr || file_path == nullptr || file_path[0] == '\0') {
+    Serial.println("Audio: Start nicht moeglich (SD/out/Pfad)");
+    stop_preview_audio_internal();
+    return false;
   }
 
-  ui_object_set_themeable_style_property(
-      adhanDropdown,
-      LV_PART_MAIN | LV_STATE_DEFAULT,
-      LV_STYLE_BG_COLOR,
-      _ui_theme_color_background);
-  ui_object_set_themeable_style_property(
-      adhanDropdown,
-      LV_PART_MAIN | LV_STATE_DEFAULT,
-      LV_STYLE_BG_OPA,
-      _ui_theme_alpha_background);
-  ui_object_set_themeable_style_property(
-      adhanDropdown,
-      LV_PART_MAIN | LV_STATE_DEFAULT,
-      LV_STYLE_BORDER_COLOR,
-      _ui_theme_color_primary);
-  ui_object_set_themeable_style_property(
-      adhanDropdown,
-      LV_PART_MAIN | LV_STATE_DEFAULT,
-      LV_STYLE_BORDER_OPA,
-      _ui_theme_alpha_primary);
-  ui_object_set_themeable_style_property(
-      adhanDropdown,
-      LV_PART_MAIN | LV_STATE_DEFAULT,
-      LV_STYLE_TEXT_COLOR,
-      _ui_theme_color_title);
-  ui_object_set_themeable_style_property(
-      adhanDropdown,
-      LV_PART_MAIN | LV_STATE_DEFAULT,
-      LV_STYLE_TEXT_OPA,
-      _ui_theme_alpha_title);
-  lv_obj_set_style_border_width(adhanDropdown, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+  stop_preview_audio_internal();
+  toneFile = open_audio_file(file_path);
+  if (toneFile == nullptr) {
+    return false;
+  }
+
+  mp3Tone = new AudioGeneratorMP3();
+  if (!mp3Tone->begin(toneFile, out)) {
+    Serial.printf("Audio: MP3 Start fehlgeschlagen %s\n", file_path);
+    delete mp3Tone;
+    mp3Tone = nullptr;
+    delete toneFile;
+    toneFile = nullptr;
+    return false;
+  }
+
+  previewActive = true;
+  previewOptionIndex = option_index;
+  update_audio_gain();
+  return true;
 }
 
-void layout_settings_screen() {
-  if (ui_Screen_SettingsScreen == nullptr ||
-      ui_SettingsScreen_Container_Container11 == nullptr ||
-      ui_SettingsScreen_Container_Container18 == nullptr) {
-    return;
-  }
-
-  lv_obj_add_flag(ui_Screen_SettingsScreen, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_scroll_dir(ui_Screen_SettingsScreen, LV_DIR_VER);
-  lv_obj_set_scrollbar_mode(ui_Screen_SettingsScreen, LV_SCROLLBAR_MODE_AUTO);
-  lv_obj_set_style_pad_top(ui_Screen_SettingsScreen, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
-  lv_obj_set_style_pad_bottom(ui_Screen_SettingsScreen, 18, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-  lv_obj_set_align(ui_SettingsScreen_Container_Container11, LV_ALIGN_TOP_MID);
-  lv_obj_set_x(ui_SettingsScreen_Container_Container11, 0);
-  lv_obj_set_y(ui_SettingsScreen_Container_Container11, 10);
-  lv_obj_set_height(ui_SettingsScreen_Container_Container11, LV_SIZE_CONTENT);
-  lv_obj_set_flex_flow(ui_SettingsScreen_Container_Container11, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_flex_align(
-      ui_SettingsScreen_Container_Container11,
-      LV_FLEX_ALIGN_START,
-      LV_FLEX_ALIGN_START,
-      LV_FLEX_ALIGN_START);
-  lv_obj_set_style_pad_row(ui_SettingsScreen_Container_Container11, 14, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-  lv_obj_update_layout(ui_SettingsScreen_Container_Container11);
-
-  lv_obj_set_align(ui_SettingsScreen_Container_Container18, LV_ALIGN_TOP_MID);
-  lv_obj_set_x(ui_SettingsScreen_Container_Container18, 0);
-  lv_obj_set_y(
-      ui_SettingsScreen_Container_Container18,
-      lv_obj_get_y(ui_SettingsScreen_Container_Container11) +
-          lv_obj_get_height(ui_SettingsScreen_Container_Container11) + 24);
-}
-
-void create_extra_settings_controls() {
-  if (ui_SettingsScreen_Container_Container11 == nullptr || themeRow != nullptr) {
-    return;
-  }
-
-  themeRow = create_settings_row(ui_SettingsScreen_Container_Container11);
-
-  if (ui_SettingsScreen_Switch_Theme_Label != nullptr) {
-    lv_obj_set_parent(ui_SettingsScreen_Switch_Theme_Label, themeRow);
-    ui_object_set_themeable_style_property(
-        ui_SettingsScreen_Switch_Theme_Label,
-        LV_PART_MAIN | LV_STATE_DEFAULT,
-        LV_STYLE_TEXT_COLOR,
-        _ui_theme_color_title);
-    ui_object_set_themeable_style_property(
-        ui_SettingsScreen_Switch_Theme_Label,
-        LV_PART_MAIN | LV_STATE_DEFAULT,
-        LV_STYLE_TEXT_OPA,
-        _ui_theme_alpha_title);
-    lv_obj_set_style_text_font(
-        ui_SettingsScreen_Switch_Theme_Label,
-        &lv_font_montserrat_16,
-        LV_PART_MAIN | LV_STATE_DEFAULT);
-  }
-
-  if (ui_SettingsScreen_Switch_Theme != nullptr) {
-    lv_obj_set_parent(ui_SettingsScreen_Switch_Theme, themeRow);
-    lv_obj_set_width(ui_SettingsScreen_Switch_Theme, 58);
-    lv_obj_set_height(ui_SettingsScreen_Switch_Theme, 30);
-    lv_obj_set_style_bg_color(
-        ui_SettingsScreen_Switch_Theme,
-        lv_color_hex(0xD9D9D9),
-        LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(
-        ui_SettingsScreen_Switch_Theme,
-        lv_color_hex(0x2DA041),
-        LV_PART_INDICATOR | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(
-        ui_SettingsScreen_Switch_Theme,
-        lv_color_hex(0xC9A227),
-        LV_PART_INDICATOR | LV_STATE_CHECKED);
-  }
-
-  adhanRow = create_settings_row(ui_SettingsScreen_Container_Container11);
-
-  adhanLabel = lv_label_create(adhanRow);
-  lv_label_set_text(adhanLabel, "Adhan Ton");
-  ui_object_set_themeable_style_property(
-      adhanLabel,
-      LV_PART_MAIN | LV_STATE_DEFAULT,
-      LV_STYLE_TEXT_COLOR,
-      _ui_theme_color_title);
-  ui_object_set_themeable_style_property(
-      adhanLabel,
-      LV_PART_MAIN | LV_STATE_DEFAULT,
-      LV_STYLE_TEXT_OPA,
-      _ui_theme_alpha_title);
-  lv_obj_set_style_text_font(adhanLabel, &lv_font_montserrat_16, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-  adhanDropdown = lv_dropdown_create(adhanRow);
-  lv_dropdown_set_options(adhanDropdown, "Adhan 1\nAdhan 2\nAdhan 3");
-  lv_obj_set_width(adhanDropdown, 130);
-  lv_obj_add_flag(adhanDropdown, LV_OBJ_FLAG_CLICKABLE);
-  restyle_dropdown();
-}
-
-void sync_ui_from_settings() {
-  syncingUi = true;
-
-  update_volume_display();
-
-  if (ui_SettingsScreen_Switch_Theme != nullptr) {
-    if (appSettings.darkMode) {
-      lv_obj_add_state(ui_SettingsScreen_Switch_Theme, LV_STATE_CHECKED);
-    } else {
-      lv_obj_clear_state(ui_SettingsScreen_Switch_Theme, LV_STATE_CHECKED);
+int find_selected_adhan_index() {
+  for (size_t i = 0; i < adhanOptionCount; i++) {
+    if (adhanOptions[i].filePath == appSettings.adhanSoundFile) {
+      return static_cast<int>(i);
     }
   }
+  return 0;
+}
 
-  update_theme_label();
+String selected_adhan_label() {
+  int index = find_selected_adhan_index();
+  if (index >= 0 && static_cast<size_t>(index) < adhanOptionCount) {
+    return adhanOptions[index].displayName;
+  }
+  return "Keine Datei";
+}
 
-  if (adhanDropdown != nullptr) {
-    lv_dropdown_set_selected(adhanDropdown, appSettings.adhanSoundIndex);
+void ensure_default_adhan_selection() {
+  if (adhanOptionCount == 0) {
+    appSettings.adhanSoundFile = "";
+    return;
+  }
+  for (size_t i = 0; i < adhanOptionCount; i++) {
+    if (adhanOptions[i].filePath == appSettings.adhanSoundFile) return;
+  }
+  appSettings.adhanSoundFile = adhanOptions[0].filePath;
+}
+
+void refresh_adhan_files() {
+  String previous_file = appSettings.adhanSoundFile;
+  clear_adhan_options();
+
+  if (sdCardOk) {
+    if (!load_adhan_directory("/Adhan")) {
+      load_adhan_directory("/adhan");
+    }
+    sort_adhan_options();
   }
 
-  syncingUi = false;
+  ensure_default_adhan_selection();
+  adhanFilesLoaded = adhanOptionCount > 0;
+  Serial.printf("Adhan Dateien gefunden: %u\n", static_cast<unsigned>(adhanOptionCount));
+
+  if (previous_file != appSettings.adhanSoundFile) {
+    save_settings();
+  }
+}
+
+void update_theme_label() {
+  settings_screen_ui_set_theme_label(appSettings.darkMode ? "Theme: Dunkel" : "Theme: Hell");
+}
+
+void sync_settings_ui() {
+  if (!initialized) return;
+  settings_screen_ui_set_volume(appSettings.volumeLevel);
+  settings_screen_ui_set_theme(appSettings.darkMode);
+  update_theme_label();
+  settings_screen_ui_set_adhan_text(selected_adhan_label().c_str());
 }
 
 void apply_theme_to_system() {
@@ -242,13 +264,13 @@ void apply_theme_to_system() {
   }
 
   ui_theme_set(appSettings.darkMode ? UI_THEME_DARK : UI_THEME_LIGHT);
-  restyle_dropdown();
-  update_theme_label();
+  sync_settings_ui();
   updateStatusIcons();
-
-  if (lv_scr_act() != nullptr) {
-    lv_obj_invalidate(lv_scr_act());
-  }
+  if (ui_Screen_SettingsScreen) lv_obj_invalidate(ui_Screen_SettingsScreen);
+  if (ui_Screen_AdhanSelectScreen) lv_obj_invalidate(ui_Screen_AdhanSelectScreen);
+  if (ui_Screen_HomeScreen) lv_obj_invalidate(ui_Screen_HomeScreen);
+  if (ui_Screen_PrayersScreen) lv_obj_invalidate(ui_Screen_PrayersScreen);
+  if (ui_Screen_AzanScreen) lv_obj_invalidate(ui_Screen_AzanScreen);
 }
 
 void go_to_home_screen(lv_event_t* e) {
@@ -256,128 +278,71 @@ void go_to_home_screen(lv_event_t* e) {
   changeScreen(SCREEN_HOME);
 }
 
-void adhan_dropdown_event_handler(lv_event_t* e) {
-  if (syncingUi || adhanDropdown == nullptr) {
-    return;
-  }
-
-  LV_UNUSED(e);
-  appSettings.adhanSoundIndex = lv_dropdown_get_selected(adhanDropdown);
-  if (appSettings.adhanSoundIndex > kMaxAdhanSoundIndex) {
-    appSettings.adhanSoundIndex = 0;
-  }
-
-  save_settings();
-}
-
 }  // namespace
 
 void load_settings() {
   appSettings.volumeLevel = 6;
   appSettings.darkMode = false;
-  appSettings.adhanSoundIndex = 0;
+  appSettings.adhanSoundFile = "";
 
-  if (!preferences.begin(kPrefsNamespace, true)) {
-    Serial.println("Preferences konnten nicht gelesen werden");
-    return;
-  }
-
+  if (!preferences.begin(kPrefsNamespace, true)) return;
   appSettings.volumeLevel = preferences.getUChar("volume", 6);
   appSettings.darkMode = preferences.getBool("dark", false);
-  appSettings.adhanSoundIndex = preferences.getUChar("adhan", 0);
+  appSettings.adhanSoundFile = preferences.getString("adhan_file", "");
   preferences.end();
 
   if (appSettings.volumeLevel > kMaxVolume) {
     appSettings.volumeLevel = 6;
-  }
-  if (appSettings.adhanSoundIndex > kMaxAdhanSoundIndex) {
-    appSettings.adhanSoundIndex = 0;
   }
 }
 
 void apply_settings() {
   apply_theme_to_system();
   update_audio_gain();
-
-  if (initialized) {
-    sync_ui_from_settings();
-    layout_settings_screen();
+  if (!adhanFilesLoaded && sdCardOk) {
+    refresh_adhan_files();
   }
+  sync_settings_ui();
 }
 
 void settings_screen_init() {
-  if (initialized) {
-    return;
-  }
+  if (initialized) return;
 
-  create_extra_settings_controls();
-
-  if (ui_SettingsScreen_Button_ResetButton2 != nullptr) {
-    lv_obj_add_event_cb(ui_SettingsScreen_Button_ResetButton2, reset_app, LV_EVENT_CLICKED, nullptr);
-  }
-
-  if (ui_SettingsScreen_Button_HomeButton != nullptr) {
-    lv_obj_add_event_cb(ui_SettingsScreen_Button_HomeButton, go_to_home_screen, LV_EVENT_CLICKED, nullptr);
-  }
-
-  if (ui_SettingsScreen_Button_SoundPlusButton1 != nullptr) {
-    lv_obj_add_flag(ui_SettingsScreen_Button_SoundPlusButton1, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(
-        ui_SettingsScreen_Button_SoundPlusButton1, volume_increase, LV_EVENT_CLICKED, nullptr);
-  }
-
-  if (ui_SettingsScreen_Button_SoundMinusButton != nullptr) {
-    lv_obj_add_flag(ui_SettingsScreen_Button_SoundMinusButton, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(
-        ui_SettingsScreen_Button_SoundMinusButton, volume_decrease, LV_EVENT_CLICKED, nullptr);
-  }
-
-  if (ui_SettingsScreen_Switch_Theme != nullptr) {
-    lv_obj_add_flag(ui_SettingsScreen_Switch_Theme, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(
-        ui_SettingsScreen_Switch_Theme, theme_switch_event_handler, LV_EVENT_VALUE_CHANGED, nullptr);
-  }
-
-  if (adhanDropdown != nullptr) {
-    lv_obj_add_event_cb(adhanDropdown, adhan_dropdown_event_handler, LV_EVENT_VALUE_CHANGED, nullptr);
-  }
-
-  layout_settings_screen();
-  sync_ui_from_settings();
-  update_audio_gain();
+  settings_screen_ui_init(
+      reset_app,
+      go_to_home_screen,
+      volume_decrease,
+      volume_increase,
+      theme_switch_event_handler,
+      settings_screen_open_adhan_selector);
 
   initialized = true;
-}
-
-void theme_switch_event_handler(lv_event_t* e) {
-  if (syncingUi) {
-    return;
-  }
-
-  lv_obj_t* obj = lv_event_get_target(e);
-  appSettings.darkMode = lv_obj_has_state(obj, LV_STATE_CHECKED);
-
-  apply_theme_to_system();
-  save_settings();
-}
-
-void reset_app(lv_event_t* e) {
-  LV_UNUSED(e);
-  Serial.printf("clicked reset_app\n");
-  esp_restart();
+  refresh_adhan_files();
+  sync_settings_ui();
+  update_audio_gain();
 }
 
 void settings_screen_loop() {
   if (!initialized) {
     settings_screen_init();
   }
-
+  if (!adhanFilesLoaded && sdCardOk) {
+    refresh_adhan_files();
+    sync_settings_ui();
+  }
   handleToneTick();
+}
+
+void theme_switch_event_handler(lv_event_t* e) {
+  if (settings_screen_ui_is_syncing()) return;
+  lv_obj_t* obj = lv_event_get_target(e);
+  appSettings.darkMode = lv_obj_has_state(obj, LV_STATE_CHECKED);
+  apply_theme_to_system();
+  save_settings();
 }
 
 void volume_increase(lv_event_t* e) {
   LV_UNUSED(e);
-
   if (appSettings.volumeLevel < kMaxVolume) {
     appSettings.volumeLevel++;
     update_volume_display();
@@ -389,7 +354,6 @@ void volume_increase(lv_event_t* e) {
 
 void volume_decrease(lv_event_t* e) {
   LV_UNUSED(e);
-
   if (appSettings.volumeLevel > kMinVolume) {
     appSettings.volumeLevel--;
     update_volume_display();
@@ -400,62 +364,77 @@ void volume_decrease(lv_event_t* e) {
 }
 
 void update_volume_display() {
-  if (ui_SettingsScreen_Label_SoundLevelLabel != nullptr) {
-    char buf[10];
-    snprintf(buf, sizeof(buf), "%u", appSettings.volumeLevel);
-    lv_label_set_text(ui_SettingsScreen_Label_SoundLevelLabel, buf);
-    lv_obj_invalidate(ui_SettingsScreen_Label_SoundLevelLabel);
-  }
+  settings_screen_ui_set_volume(appSettings.volumeLevel);
 }
 
 void update_audio_gain() {
   if (out != nullptr) {
     out->SetGain(appSettings.volumeLevel / 10.0f);
   }
-
-  Serial.printf("Volume: %u (Gain: %.2f)\n", appSettings.volumeLevel, appSettings.volumeLevel / 10.0f);
 }
 
 void handleToneTick() {
-  if (mp3Tone && mp3Tone->isRunning()) {
-    if (!mp3Tone->loop()) {
-      mp3Tone->stop();
-      delete mp3Tone;
-      mp3Tone = nullptr;
-
-      delete toneFile;
-      toneFile = nullptr;
+  if (mp3Tone) {
+    if (mp3Tone->isRunning()) {
+      if (!mp3Tone->loop()) {
+        stop_preview_audio_internal();
+      }
+    } else {
+      stop_preview_audio_internal();
     }
   }
 }
 
 void playTone() {
-  if (!sdCardOk || out == nullptr) {
-    return;
+  if (currentScreen != SCREEN_SETTINGS) return;
+  if (start_audio_file("/beep.mp3", -1)) return;
+  if (appSettings.adhanSoundFile.length() > 0) {
+    start_audio_file(appSettings.adhanSoundFile.c_str(), -1);
   }
+}
 
-  if (mp3Tone) {
-    mp3Tone->stop();
-    delete mp3Tone;
-    mp3Tone = nullptr;
-  }
-  if (toneFile) {
-    delete toneFile;
-    toneFile = nullptr;
-  }
+void settings_screen_stop_preview() {
+  stop_preview_audio_internal();
+}
 
-  toneFile = new AudioFileSourceSD("/beep.mp3");
-  mp3Tone = new AudioGeneratorMP3();
+void reset_app(lv_event_t* e) {
+  LV_UNUSED(e);
+  settings_screen_stop_preview();
+  esp_restart();
+}
 
-  if (!mp3Tone->begin(toneFile, out)) {
-    Serial.println("MP3 Tone start failed!");
-    delete mp3Tone;
-    mp3Tone = nullptr;
-    delete toneFile;
-    toneFile = nullptr;
-    return;
-  }
+size_t settings_screen_get_adhan_option_count() {
+  return adhanOptionCount;
+}
 
-  update_audio_gain();
-  Serial.println("Tone gestartet!");
+String settings_screen_get_adhan_option_label(size_t index) {
+  if (index >= adhanOptionCount) return "";
+  return adhanOptions[index].displayName;
+}
+
+bool settings_screen_is_selected_adhan_option(size_t index) {
+  return index < adhanOptionCount && adhanOptions[index].filePath == appSettings.adhanSoundFile;
+}
+
+bool settings_screen_is_previewing_option(size_t index) {
+  return previewActive && previewOptionIndex == static_cast<int>(index);
+}
+
+bool settings_screen_select_adhan_option(size_t index) {
+  if (index >= adhanOptionCount) return false;
+  appSettings.adhanSoundFile = adhanOptions[index].filePath;
+  save_settings();
+  sync_settings_ui();
+  return true;
+}
+
+bool settings_screen_play_preview_for_option(size_t index) {
+  if (index >= adhanOptionCount) return false;
+  return start_audio_file(adhanOptions[index].filePath.c_str(), static_cast<int>(index));
+}
+
+void settings_screen_open_adhan_selector(lv_event_t* e) {
+  LV_UNUSED(e);
+  settings_screen_stop_preview();
+  changeScreen(SCREEN_ADHAN_SELECT);
 }

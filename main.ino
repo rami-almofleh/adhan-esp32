@@ -9,6 +9,7 @@
 #include "prayers_screen_logic.h"
 #include "settings_screen_logic.h"
 #include "azan_screen_logic.h"
+#include "adhan_select_screen_logic.h"
 
 TFT_eSPI tft = TFT_eSPI();
 
@@ -57,6 +58,7 @@ void init_disp_driver() {
   disp_drv.ver_res = DISP_VER_RES;
   disp_drv.flush_cb = my_disp_flush;
   disp_drv.draw_buf = &draw_buf;
+  disp_drv.full_refresh = 1;
 
   lv_disp_drv_register(&disp_drv);
 }
@@ -134,6 +136,12 @@ void setup() {
   ui_init();
   apply_settings();
 
+  home_screen_init();
+  prayers_screen_init();
+  settings_screen_init();
+  azan_screen_init();
+  adhan_select_screen_init();
+
   start_screen_init();
 
   static lv_indev_drv_t indev_drv;
@@ -171,6 +179,9 @@ void loop() {
       break;
     case SCREEN_AZAN:
       azan_screen_loop();
+      break;
+    case SCREEN_ADHAN_SELECT:
+      adhan_select_screen_loop();
       break;
   }
 

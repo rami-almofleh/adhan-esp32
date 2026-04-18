@@ -1,5 +1,23 @@
 #include "app_state.h"
+#include "settings_screen_logic.h"
 #include "ui.h"
+
+#include <TFT_eSPI.h>
+
+extern TFT_eSPI tft;
+
+namespace {
+
+uint16_t screen_background_color() {
+  return appSettings.darkMode ? tft.color565(16, 20, 18) : tft.color565(247, 251, 248);
+}
+
+void clear_display_for_screen_change() {
+  initHardware(H_TFT);
+  tft.fillScreen(screen_background_color());
+}
+
+}  // namespace
 
 Screen currentScreen = SCREEN_START;
 Screen screenBeforeAzan = SCREEN_HOME;
@@ -16,7 +34,7 @@ struct tm globalTime;
 bool timeValid = false;
 bool isPlaying = false;
 bool sdCardOk = false;
-AppSettings appSettings = {6, false, 0};
+AppSettings appSettings = {6, false, ""};
 AudioGeneratorMP3* mp3 = nullptr;
 AudioFileSourceSD* file = nullptr;
 AudioOutputI2S* out = nullptr;
@@ -31,28 +49,53 @@ const uint8_t SD_CS = 5;
 const uint8_t TFT_H_CS = 15;
 
 void changeScreen(Screen newScreen) {
+  if (currentScreen == newScreen) {
+    return;
+  }
+
+  if ((currentScreen == SCREEN_SETTINGS && newScreen != SCREEN_SETTINGS) ||
+      (currentScreen == SCREEN_ADHAN_SELECT && newScreen != SCREEN_ADHAN_SELECT)) {
+    settings_screen_stop_preview();
+  }
+
   if (newScreen == SCREEN_AZAN && currentScreen != SCREEN_AZAN) {
     screenBeforeAzan = currentScreen;
   }
 
+  lv_obj_t* target = nullptr;
   switch (newScreen) {
     case SCREEN_HOME:
-      lv_scr_load_anim(ui_Screen_HomeScreen, LV_SCR_LOAD_ANIM_FADE_ON, 300, 0, false);
+      target = ui_Screen_HomeScreen;
       break;
 
     case SCREEN_PRAYERS:
-      lv_scr_load_anim(ui_Screen_PrayersScreen, LV_SCR_LOAD_ANIM_FADE_ON, 300, 0, false);
+      target = ui_Screen_PrayersScreen;
       break;
 
     case SCREEN_SETTINGS:
-      lv_scr_load_anim(ui_Screen_SettingsScreen, LV_SCR_LOAD_ANIM_FADE_ON, 300, 0, false);
+      target = ui_Screen_SettingsScreen;
       break;
 
     case SCREEN_AZAN:
-      lv_scr_load_anim(ui_Screen_AzanScreen, LV_SCR_LOAD_ANIM_FADE_ON, 300, 0, false);
+      target = ui_Screen_AzanScreen;
+      break;
+
+    case SCREEN_ADHAN_SELECT:
+      target = ui_Screen_AdhanSelectScreen;
+      break;
+
+    default:
       break;
   }
 
+  if (target == nullptr) {
+    return;
+  }
+
+  clear_display_for_screen_change();
+  lv_scr_load(target);
+  lv_obj_invalidate(target);
+  lv_refr_now(NULL);
   currentScreen = newScreen;
 }
 

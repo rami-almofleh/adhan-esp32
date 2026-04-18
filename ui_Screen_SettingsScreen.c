@@ -5,7 +5,7 @@
 
 #include "ui.h"
 
-lv_obj_t *ui_SettingsScreen_Switch_Theme_Label = NULL;lv_obj_t *ui_SettingsScreen_Switch_Theme = NULL;lv_obj_t *ui_Screen_SettingsScreen = NULL;lv_obj_t *ui_SettingsScreen_Container_Container18 = NULL;lv_obj_t *ui_SettingsScreen_Button_ResetButton2 = NULL;lv_obj_t *ui_SettingsScreen_Label_Label5 = NULL;lv_obj_t *ui_SettingsScreen_Button_HomeButton = NULL;lv_obj_t *ui_SettingsScreen_Label_Label3 = NULL;lv_obj_t *ui_SettingsScreen_Container_Container11 = NULL;lv_obj_t *ui_SettingsScreen_Label_SeetingsTitle = NULL;lv_obj_t *ui_SettingsScreen_Label_Label6 = NULL;lv_obj_t *ui_SettingsScreen_Container_Container13 = NULL;lv_obj_t *ui_SettingsScreen_Button_SoundMinusButton = NULL;lv_obj_t *ui_SettingsScreen_Label_Label9 = NULL;lv_obj_t *ui_SettingsScreen_Label_SoundLevelLabel = NULL;lv_obj_t *ui_SettingsScreen_Button_SoundPlusButton1 = NULL;lv_obj_t *ui_SettingsScreen_Label_Label7 = NULL;
+lv_obj_t *ui_SettingsScreen_Switch_Theme_Label = NULL;lv_obj_t *ui_SettingsScreen_Switch_Theme = NULL;lv_obj_t *ui_Screen_SettingsScreen = NULL;lv_obj_t *ui_SettingsScreen_Container_Container18 = NULL;lv_obj_t *ui_SettingsScreen_Button_ResetButton2 = NULL;lv_obj_t *ui_SettingsScreen_Label_Label5 = NULL;lv_obj_t *ui_SettingsScreen_Button_HomeButton = NULL;lv_obj_t *ui_SettingsScreen_Label_Label3 = NULL;lv_obj_t *ui_SettingsScreen_Container_Container11 = NULL;lv_obj_t *ui_SettingsScreen_Label_SeetingsTitle = NULL;lv_obj_t *ui_SettingsScreen_Label_Label6 = NULL;lv_obj_t *ui_SettingsScreen_Container_Container13 = NULL;lv_obj_t *ui_SettingsScreen_Button_SoundMinusButton = NULL;lv_obj_t *ui_SettingsScreen_Label_Label9 = NULL;lv_obj_t *ui_SettingsScreen_Label_SoundLevelLabel = NULL;lv_obj_t *ui_SettingsScreen_Button_SoundPlusButton1 = NULL;lv_obj_t *ui_SettingsScreen_Label_Label7 = NULL;lv_obj_t *ui_SettingsScreen_Container_ThemeRow = NULL;lv_obj_t *ui_SettingsScreen_Container_AdhanRow = NULL;lv_obj_t *ui_SettingsScreen_Label_AdhanLabel = NULL;lv_obj_t *ui_SettingsScreen_Button_AdhanChangeButton = NULL;lv_obj_t *ui_SettingsScreen_Label_AdhanChangeLabel = NULL;
 // event funtions
 
 // build funtions
@@ -186,30 +186,57 @@ ui_object_set_themeable_style_property(ui_SettingsScreen_Label_Label7, LV_PART_M
 lv_obj_set_style_text_font(ui_SettingsScreen_Label_Label7, &lv_font_montserrat_24, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 
-ui_SettingsScreen_Switch_Theme_Label = lv_label_create(ui_SettingsScreen_Container_Container11);
+ui_SettingsScreen_Container_ThemeRow = lv_obj_create(ui_SettingsScreen_Container_Container11);
+lv_obj_remove_style_all(ui_SettingsScreen_Container_ThemeRow);
+lv_obj_set_width( ui_SettingsScreen_Container_ThemeRow, lv_pct(100));
+lv_obj_set_height( ui_SettingsScreen_Container_ThemeRow, LV_SIZE_CONTENT);
+lv_obj_set_flex_flow(ui_SettingsScreen_Container_ThemeRow,LV_FLEX_FLOW_ROW);
+lv_obj_set_flex_align(ui_SettingsScreen_Container_ThemeRow, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+lv_obj_clear_flag( ui_SettingsScreen_Container_ThemeRow, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE );
+lv_obj_set_style_pad_row(ui_SettingsScreen_Container_ThemeRow, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_pad_column(ui_SettingsScreen_Container_ThemeRow, 12, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+ui_SettingsScreen_Switch_Theme_Label = lv_label_create(ui_SettingsScreen_Container_ThemeRow);
 lv_label_set_text(ui_SettingsScreen_Switch_Theme_Label, "Theme:");
-lv_obj_align(ui_SettingsScreen_Switch_Theme_Label, LV_ALIGN_LEFT_MID, -10, 0);
 lv_obj_clear_flag(ui_SettingsScreen_Switch_Theme_Label, LV_OBJ_FLAG_HIDDEN);
 
-
-ui_SettingsScreen_Switch_Theme = lv_switch_create(ui_SettingsScreen_Container_Container11);
+ui_SettingsScreen_Switch_Theme = lv_switch_create(ui_SettingsScreen_Container_ThemeRow);
 lv_obj_set_width(ui_SettingsScreen_Switch_Theme, 50);
 lv_obj_set_height(ui_SettingsScreen_Switch_Theme, 25);
-lv_obj_align(ui_SettingsScreen_Switch_Theme, LV_ALIGN_CENTER, 0, 0);
 lv_obj_add_flag(ui_SettingsScreen_Switch_Theme, LV_OBJ_FLAG_CLICKABLE);
 lv_obj_set_style_bg_color(ui_SettingsScreen_Switch_Theme,
-    lv_palette_main(LV_PALETTE_GREEN),     // Grün -> Light Mode
+    lv_palette_main(LV_PALETTE_GREEN),
     LV_PART_INDICATOR | LV_STATE_CHECKED);
-
 lv_obj_set_style_bg_color(ui_SettingsScreen_Switch_Theme,
-    lv_palette_main(LV_PALETTE_BLUE),     // Blau -> Dark Mode
+    lv_palette_main(LV_PALETTE_BLUE),
     LV_PART_INDICATOR);
-
 lv_obj_set_style_bg_color(ui_SettingsScreen_Switch_Theme,
-    lv_palette_main(LV_PALETTE_GREY),     // Grau -> Default Hintergrund
+    lv_palette_main(LV_PALETTE_GREY),
     LV_PART_MAIN);
 lv_obj_set_style_outline_color(ui_SettingsScreen_Switch_Theme, lv_palette_main(LV_PALETTE_BLUE), LV_PART_MAIN | LV_STATE_DEFAULT);
 lv_obj_clear_state(ui_SettingsScreen_Switch_Theme, LV_STATE_DISABLED);
+
+ui_SettingsScreen_Container_AdhanRow = lv_obj_create(ui_SettingsScreen_Container_Container11);
+lv_obj_remove_style_all(ui_SettingsScreen_Container_AdhanRow);
+lv_obj_set_width( ui_SettingsScreen_Container_AdhanRow, lv_pct(100));
+lv_obj_set_height( ui_SettingsScreen_Container_AdhanRow, LV_SIZE_CONTENT);
+lv_obj_set_flex_flow(ui_SettingsScreen_Container_AdhanRow,LV_FLEX_FLOW_ROW);
+lv_obj_set_flex_align(ui_SettingsScreen_Container_AdhanRow, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+lv_obj_clear_flag( ui_SettingsScreen_Container_AdhanRow, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE );
+lv_obj_set_style_pad_row(ui_SettingsScreen_Container_AdhanRow, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_pad_column(ui_SettingsScreen_Container_AdhanRow, 12, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+ui_SettingsScreen_Label_AdhanLabel = lv_label_create(ui_SettingsScreen_Container_AdhanRow);
+lv_label_set_text(ui_SettingsScreen_Label_AdhanLabel, "Adhan Ton");
+
+ui_SettingsScreen_Button_AdhanChangeButton = lv_btn_create(ui_SettingsScreen_Container_AdhanRow);
+lv_obj_set_width( ui_SettingsScreen_Button_AdhanChangeButton, 112);
+lv_obj_set_height( ui_SettingsScreen_Button_AdhanChangeButton, 32);
+lv_obj_clear_flag( ui_SettingsScreen_Button_AdhanChangeButton, LV_OBJ_FLAG_SCROLLABLE );
+
+ui_SettingsScreen_Label_AdhanChangeLabel = lv_label_create(ui_SettingsScreen_Button_AdhanChangeButton);
+lv_obj_set_align( ui_SettingsScreen_Label_AdhanChangeLabel, LV_ALIGN_CENTER );
+lv_label_set_text(ui_SettingsScreen_Label_AdhanChangeLabel,"Aendern");
 
 }
 
@@ -233,7 +260,12 @@ ui_SettingsScreen_Label_Label9= NULL;
 ui_SettingsScreen_Label_SoundLevelLabel= NULL;
 ui_SettingsScreen_Button_SoundPlusButton1= NULL;
 ui_SettingsScreen_Label_Label7= NULL;
+ui_SettingsScreen_Container_ThemeRow= NULL;
 ui_SettingsScreen_Switch_Theme= NULL;
 ui_SettingsScreen_Switch_Theme_Label= NULL;
+ui_SettingsScreen_Container_AdhanRow= NULL;
+ui_SettingsScreen_Label_AdhanLabel= NULL;
+ui_SettingsScreen_Button_AdhanChangeButton= NULL;
+ui_SettingsScreen_Label_AdhanChangeLabel= NULL;
 
 }
