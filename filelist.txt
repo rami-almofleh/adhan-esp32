@@ -1,0 +1,11 @@
+ui_comp_systemloadinglabel.c
+ui_comp.c
+ui_Screen_StartScreen.c
+ui_Screen_HomeScreen.c
+ui_Screen_PrayersScreen.c
+ui_Screen_SettingsScreen.c
+ui_theme_manager.c
+ui_themes.c
+ui.c
+ui_comp_hook.c
+ui_helpers.c
