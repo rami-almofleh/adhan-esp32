@@ -69,7 +69,7 @@ void style_screen() {
   lv_obj_set_width(ui_HomeScreen_Label_DiffLabel, lv_pct(100));
   lv_obj_set_style_text_align(ui_HomeScreen_Label_DiffLabel, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN | LV_STATE_DEFAULT);
   lv_obj_set_style_text_line_space(ui_HomeScreen_Label_DiffLabel, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
-  lv_obj_set_style_text_font(ui_HomeScreen_Label_DiffLabel, &lv_font_montserrat_34, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_text_font(ui_HomeScreen_Label_DiffLabel, &lv_font_montserrat_42, LV_PART_MAIN | LV_STATE_DEFAULT);
 
   lv_obj_set_width(ui_HomeScreen_Label_ClockLabel, 296);
   lv_label_set_long_mode(ui_HomeScreen_Label_ClockLabel, LV_LABEL_LONG_CLIP);
@@ -77,7 +77,7 @@ void style_screen() {
   lv_obj_set_x(ui_HomeScreen_Label_ClockLabel, 0);
   lv_obj_set_y(ui_HomeScreen_Label_ClockLabel, -24);
   lv_obj_set_style_text_align(ui_HomeScreen_Label_ClockLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-  lv_obj_set_style_text_font(ui_HomeScreen_Label_ClockLabel, &lv_font_montserrat_30, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_text_font(ui_HomeScreen_Label_ClockLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
   lv_obj_set_width(ui_HomeScreen_Label_DateLabel, 296);
   lv_obj_set_align(ui_HomeScreen_Label_DateLabel, LV_ALIGN_BOTTOM_MID);

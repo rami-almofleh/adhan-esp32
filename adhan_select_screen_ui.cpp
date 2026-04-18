@@ -83,7 +83,7 @@ lv_obj_t* play_label_at(size_t index) {
 
 void style_button(lv_obj_t* button, bool filled) {
   if (button == NULL) return;
-  lv_obj_set_width(button, 60);
+  lv_obj_set_width(button, 76);
   lv_obj_set_height(button, 28);
   lv_obj_set_style_radius(button, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
   lv_obj_set_style_border_width(button, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -127,7 +127,7 @@ void style_screen() {
 
     ui_object_set_themeable_style_property(label, LV_PART_MAIN | LV_STATE_DEFAULT, LV_STYLE_TEXT_COLOR, _ui_theme_color_title);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_width(label, 160);
+    lv_obj_set_width(label, 132);
     lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
 
     lv_obj_set_style_border_width(checkbox, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -139,8 +139,13 @@ void style_screen() {
     ui_object_set_themeable_style_property(checkbox, LV_PART_INDICATOR | LV_STATE_CHECKED, LV_STYLE_BG_COLOR, _ui_theme_color_primary);
 
     style_button(button, true);
-    lv_obj_set_style_text_font(play_label_at(i), &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(play_label_at(i), lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_t* playLabel = play_label_at(i);
+    lv_obj_set_width(playLabel, lv_pct(100));
+    lv_obj_set_align(playLabel, LV_ALIGN_CENTER);
+    lv_obj_set_style_text_align(playLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_label_set_long_mode(playLabel, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_font(playLabel, &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(playLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
   }
 
   style_button(ui_AdhanSelectScreen_Button_Back, true);
@@ -178,6 +183,8 @@ void adhan_select_screen_ui_refresh(size_t count, const String* labels, int sele
       if (static_cast<int>(i) == selected_index) lv_obj_add_state(checkbox, LV_STATE_CHECKED);
       else lv_obj_clear_state(checkbox, LV_STATE_CHECKED);
       lv_label_set_text(play_label, static_cast<int>(i) == preview_index ? "Stop" : "Spielen");
+      lv_obj_invalidate(button_at(i));
+      lv_obj_invalidate(play_label);
     } else {
       lv_obj_add_flag(row, LV_OBJ_FLAG_HIDDEN);
     }

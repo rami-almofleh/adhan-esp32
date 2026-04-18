@@ -2,7 +2,7 @@
 
 void start_screen_init();
 void start_screen_loop();
-void fetchPrayerTimes();
+bool fetchPrayerTimes();
 void updateStatus(const char* text);
 long timeToSeconds(String t);
 void initWIFI();

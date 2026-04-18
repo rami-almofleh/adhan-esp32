@@ -429,7 +429,11 @@ bool settings_screen_select_adhan_option(size_t index) {
 }
 
 bool settings_screen_play_preview_for_option(size_t index) {
-  if (index >= adhanOptionCount) return false;
+  if (index >= adhanOptionCount) {
+    Serial.printf("Audio: ungueltiger Auswahlindex %u\n", static_cast<unsigned>(index));
+    return false;
+  }
+  Serial.printf("Audio: Vorschau fuer %s\n", adhanOptions[index].filePath.c_str());
   return start_audio_file(adhanOptions[index].filePath.c_str(), static_cast<int>(index));
 }
 

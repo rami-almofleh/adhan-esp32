@@ -154,12 +154,25 @@ void setup() {
 void loop() {
   // Update Time
   static unsigned long lastTimeUpdate = 0;
+  static int lastPrayerFetchDay = -1;
 
   if (millis() - lastTimeUpdate >= 1000) {
     lastTimeUpdate = millis();
     updateTime();
     updateStatusIcons();
     if (currentStatus == ST_RUNNING) {
+      if (timeValid) {
+        calculateNextPrayer();
+
+        if (lastPrayerFetchDay == -1) {
+          lastPrayerFetchDay = globalTime.tm_yday;
+        } else if (globalTime.tm_yday != lastPrayerFetchDay) {
+          if (fetchPrayerTimes()) {
+            lastPrayerFetchDay = globalTime.tm_yday;
+            calculateNextPrayer();
+          }
+        }
+      }
       checkAdhanLogic();
     }
   }

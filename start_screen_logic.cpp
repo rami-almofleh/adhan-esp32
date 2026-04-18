@@ -149,7 +149,7 @@ void updateStatus(const char* text) {
   Serial.println(text);
 }
 
-void fetchPrayerTimes() {
+bool fetchPrayerTimes() {
   updateStatus("Daten holen!");
 
   HTTPClient http;
@@ -157,18 +157,24 @@ void fetchPrayerTimes() {
   http.setTimeout(10000);
 
   int httpCode = http.GET();
+  bool success = false;
 
   if (httpCode == 200) {
     String payload = http.getString();
 
     DynamicJsonDocument doc(2048);
-    deserializeJson(doc, payload);
+    DeserializationError error = deserializeJson(doc, payload);
 
-    prayers[0] = { "Fajr", doc["fajr"], timeToSeconds(doc["fajr"]) };
-    prayers[1] = { "Duhur", doc["dohr"], timeToSeconds(doc["dohr"]) };
-    prayers[2] = { "Asr", doc["asr"], timeToSeconds(doc["asr"]) };
-    prayers[3] = { "Maghreb", doc["maghreb"], timeToSeconds(doc["maghreb"]) };
-    prayers[4] = { "Isha", doc["icha"], timeToSeconds(doc["icha"]) };
+    if (!error) {
+      prayers[0] = { "Fajr", doc["fajr"], timeToSeconds(doc["fajr"]) };
+      prayers[1] = { "Duhur", doc["dohr"], timeToSeconds(doc["dohr"]) };
+      prayers[2] = { "Asr", doc["asr"], timeToSeconds(doc["asr"]) };
+      prayers[3] = { "Maghreb", doc["maghreb"], timeToSeconds(doc["maghreb"]) };
+      prayers[4] = { "Isha", doc["icha"], timeToSeconds(doc["icha"]) };
+      success = true;
+    } else {
+      Serial.printf("JSON Fehler: %s\n", error.c_str());
+    }
   } else {
     Serial.println("HTTP Fehler!");
   }
@@ -184,6 +190,7 @@ void fetchPrayerTimes() {
   }
 
   updateStatus("Daten bereit!");
+  return success;
 }
 
 long timeToSeconds(String t) {
