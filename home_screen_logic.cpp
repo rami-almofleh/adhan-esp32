@@ -51,6 +51,8 @@ void go_to_settings_screen(lv_event_t* e) {
 
 void home_screen_loop() {
   static bool wasActive = false;
+  static unsigned long homeActivatedAt = 0;
+  static bool adhanTestTriggered = false;
 
   if (ui_Screen_HomeScreen == NULL) return;
 
@@ -62,15 +64,32 @@ void home_screen_loop() {
 
   if (lv_scr_act() != ui_Screen_HomeScreen) {
     wasActive = false;
+    homeActivatedAt = 0;
+    adhanTestTriggered = false;
     return;
   }
 
   if (!wasActive) {
     home_screen_ui_reset_actions();
+    homeActivatedAt = millis();
+    adhanTestTriggered = false;
     wasActive = true;
   }
 
   home_screen_ui_tick();
+
+  if (!adhanTestTriggered && homeActivatedAt != 0 && millis() - homeActivatedAt >= 10000) {
+    if (timeValid) {
+      calculateNextPrayer();
+    } else if (nextPrayerIndex < 0 || nextPrayerIndex >= 5) {
+      nextPrayerIndex = 0;
+    }
+
+    adhanTestTriggered = true;
+    changeScreen(SCREEN_AZAN);
+    return;
+  }
+
   if (!timeValid) return;
 
   static unsigned long last1s = 0;

@@ -19,8 +19,13 @@ void go_to_home_screen(lv_event_t* e) {
 void prayers_screen_init() {
   if (initialized) return;
 
+  calculateNextPrayer();
   prayers_screen_ui_init(go_to_home_screen);
   prayers_screen_ui_refresh(prayers, nextPrayerIndex);
+  if (ui_Screen_PrayersScreen != NULL) {
+    lv_obj_update_layout(ui_Screen_PrayersScreen);
+    lv_obj_invalidate(ui_Screen_PrayersScreen);
+  }
   initialized = true;
 }
 
@@ -50,6 +55,8 @@ void prayers_screen_loop() {
 
   if (prayerDataChanged || lastShownPrayerIndex != nextPrayerIndex) {
     prayers_screen_ui_refresh(prayers, nextPrayerIndex);
+    lv_obj_update_layout(ui_Screen_PrayersScreen);
+    lv_obj_invalidate(ui_Screen_PrayersScreen);
     lastShownPrayerIndex = nextPrayerIndex;
     forceRefresh = false;
   }

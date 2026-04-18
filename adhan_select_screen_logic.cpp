@@ -46,18 +46,26 @@ void refresh_screen() {
 }
 
 void select_handler(lv_event_t* e) {
-  uintptr_t index = reinterpret_cast<uintptr_t>(lv_event_get_user_data(e));
-  settings_screen_select_adhan_option(static_cast<size_t>(index));
+  size_t* index_ptr = static_cast<size_t*>(lv_event_get_user_data(e));
+  if (index_ptr == nullptr) return;
+  settings_screen_select_adhan_option(*index_ptr);
   refresh_screen();
 }
 
 void play_handler(lv_event_t* e) {
-  uintptr_t index = reinterpret_cast<uintptr_t>(lv_event_get_user_data(e));
-  size_t option_index = static_cast<size_t>(index);
+  size_t* index_ptr = static_cast<size_t*>(lv_event_get_user_data(e));
+  if (index_ptr == nullptr) return;
+  size_t option_index = *index_ptr;
+  settings_screen_play_preview_for_option(option_index);
+  refresh_screen();
+}
+
+void stop_handler(lv_event_t* e) {
+  size_t* index_ptr = static_cast<size_t*>(lv_event_get_user_data(e));
+  if (index_ptr == nullptr) return;
+  size_t option_index = *index_ptr;
   if (settings_screen_is_previewing_option(option_index)) {
     settings_screen_stop_preview();
-  } else {
-    settings_screen_play_preview_for_option(option_index);
   }
   refresh_screen();
 }
@@ -72,7 +80,7 @@ void back_handler(lv_event_t* e) {
 
 void adhan_select_screen_init() {
   if (initialized) return;
-  adhan_select_screen_ui_init(select_handler, play_handler, back_handler);
+  adhan_select_screen_ui_init(select_handler, play_handler, stop_handler, back_handler);
   refresh_screen();
   initialized = true;
 }

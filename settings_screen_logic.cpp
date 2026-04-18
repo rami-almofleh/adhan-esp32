@@ -84,7 +84,17 @@ String sanitize_display_name(const String& file_name) {
 }
 
 bool is_mp3_file(const String& file_name) {
-  String lower = file_name;
+  String base_name = file_name;
+  int slash_pos = base_name.lastIndexOf('/');
+  if (slash_pos >= 0) {
+    base_name = base_name.substring(slash_pos + 1);
+  }
+
+  if (base_name.length() == 0 || base_name.startsWith(".")) {
+    return false;
+  }
+
+  String lower = base_name;
   lower.toLowerCase();
   return lower.endsWith(".mp3");
 }
@@ -130,6 +140,8 @@ bool load_adhan_directory(const char* folder_path) {
         adhanOptions[adhanOptionCount].filePath = String(folder_path) + "/" + base_name;
         adhanOptions[adhanOptionCount].displayName = sanitize_display_name(base_name);
         adhanOptionCount++;
+      } else {
+        Serial.printf("Adhan Datei ignoriert: %s\n", name.c_str());
       }
     }
     entry.close();
@@ -235,6 +247,7 @@ void refresh_adhan_files() {
   Serial.printf("Adhan Dateien gefunden: %u\n", static_cast<unsigned>(adhanOptionCount));
 
   if (previous_file != appSettings.adhanSoundFile) {
+    Serial.printf("Adhan Default/Selection gesetzt: %s\n", appSettings.adhanSoundFile.c_str());
     save_settings();
   }
 }
@@ -435,6 +448,30 @@ bool settings_screen_play_preview_for_option(size_t index) {
   }
   Serial.printf("Audio: Vorschau fuer %s\n", adhanOptions[index].filePath.c_str());
   return start_audio_file(adhanOptions[index].filePath.c_str(), static_cast<int>(index));
+}
+
+void settings_screen_reload_adhan_files() {
+  refresh_adhan_files();
+  sync_settings_ui();
+}
+
+String settings_screen_get_effective_adhan_file() {
+  if ((!adhanFilesLoaded || adhanOptionCount == 0) && sdCardOk) {
+    refresh_adhan_files();
+  }
+
+  if (appSettings.adhanSoundFile.length() > 0) {
+    return appSettings.adhanSoundFile;
+  }
+
+  if (adhanOptionCount > 0) {
+    appSettings.adhanSoundFile = adhanOptions[0].filePath;
+    save_settings();
+    Serial.printf("Adhan Fallback auf erste Datei: %s\n", appSettings.adhanSoundFile.c_str());
+    return appSettings.adhanSoundFile;
+  }
+
+  return "";
 }
 
 void settings_screen_open_adhan_selector(lv_event_t* e) {

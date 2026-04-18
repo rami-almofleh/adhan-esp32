@@ -17,6 +17,8 @@ void update_audio_gain();
 void playTone();
 void handleToneTick();
 void settings_screen_stop_preview();
+void settings_screen_reload_adhan_files();
+String settings_screen_get_effective_adhan_file();
 
 size_t settings_screen_get_adhan_option_count();
 String settings_screen_get_adhan_option_label(size_t index);

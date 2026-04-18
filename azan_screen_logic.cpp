@@ -2,6 +2,7 @@
 
 #include "app_state.h"
 #include "azan_screen_ui.h"
+#include "settings_screen_logic.h"
 #include "ui.h"
 
 #include <AudioFileSourceSD.h>
@@ -25,13 +26,14 @@ AudioFileSourceSD* try_open(const char* path) {
 }
 
 AudioFileSourceSD* open_adhan_file() {
-  if (appSettings.adhanSoundFile.length() > 0) {
-    AudioFileSourceSD* selected = try_open(appSettings.adhanSoundFile.c_str());
+  String effective_file = settings_screen_get_effective_adhan_file();
+  if (effective_file.length() > 0) {
+    AudioFileSourceSD* selected = try_open(effective_file.c_str());
     if (selected) {
       return selected;
     }
 
-    String selected_path = appSettings.adhanSoundFile;
+    String selected_path = effective_file;
     int slash_pos = selected_path.lastIndexOf('/');
     String file_name = slash_pos >= 0 ? selected_path.substring(slash_pos + 1) : selected_path;
     const String selected_fallbacks[] = {

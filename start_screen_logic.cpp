@@ -1,4 +1,5 @@
 #include "app_state.h"
+#include "settings_screen_logic.h"
 #include "start_screen_logic.h"
 #include "ui.h"
 #include <WiFi.h>
@@ -124,6 +125,7 @@ void initSD() {
   
   if (ok) {
     updateStatus("SD OK!");
+    settings_screen_reload_adhan_files();
   } else {
     updateStatus("SD Karte konnte nicht gemountet werden.");  // Nicht hängen bleiben, einfach weitermachen
   }
