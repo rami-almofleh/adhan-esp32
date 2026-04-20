@@ -1,7 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <lvgl.h>
-#include <AudioOutputI2S.h>
+#include <AudioOutput.h>
 #include <AudioGeneratorMP3.h>
 #include <AudioFileSourceSD.h>
 
@@ -44,13 +44,9 @@ extern int nextPrayerIndex;
 extern struct tm globalTime;
 extern bool timeValid;
 extern AppSettings appSettings;
-extern AudioOutputI2S* out;
+extern AudioOutput* out;
 extern AudioGeneratorMP3* mp3;
 extern AudioFileSourceSD* file;
-extern AudioFileSourceSD* toneFile;
-extern AudioGeneratorMP3* mp3Tone;
-extern AudioFileSourceSD* systemStartAudioFile;
-extern AudioGeneratorMP3* systemStartAudioMp3;
 extern const uint8_t TFT_H_CS;
 extern const uint8_t SD_CS;
 extern const uint8_t TOUCH_CS;

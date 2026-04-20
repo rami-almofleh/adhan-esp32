@@ -1,19 +1,15 @@
 #include "settings_screen_logic.h"
 
+#include "audio_manager.h"
 #include "app_state.h"
 #include "home_screen_logic.h"
 #include "settings_screen_ui.h"
 #include "ui.h"
 
-#include <AudioFileSourceSD.h>
-#include <AudioGeneratorMP3.h>
-#include <AudioOutputI2S.h>
 #include <FS.h>
 #include <Preferences.h>
 #include <SD.h>
 #include <esp_system.h>
-
-extern AudioOutputI2S* out;
 
 namespace {
 
@@ -30,46 +26,9 @@ struct AdhanOption {
 Preferences preferences;
 bool initialized = false;
 bool adhanFilesLoaded = false;
-bool previewActive = false;
-int previewOptionIndex = -1;
 AdhanOption adhanOptions[kMaxAdhanFiles];
 size_t adhanOptionCount = 0;
 String persistedAdhanName = "";
-
-AudioFileSourceSD* open_audio_file(const char* file_path) {
-  if (file_path == nullptr || file_path[0] == '\0') {
-    Serial.println("Audio: leerer Dateipfad");
-    return nullptr;
-  }
-
-  AudioFileSourceSD* source = new AudioFileSourceSD(file_path);
-  if (source && source->isOpen()) {
-    Serial.printf("Audio: verwende %s\n", file_path);
-    return source;
-  }
-  delete source;
-
-  String path(file_path);
-  int slash_pos = path.lastIndexOf('/');
-  String file_name = slash_pos >= 0 ? path.substring(slash_pos + 1) : path;
-  const String fallbacks[] = {
-      String("/Adhan/") + file_name,
-      String("/adhan/") + file_name,
-      String("/") + file_name,
-      file_name};
-
-  for (const String& candidate : fallbacks) {
-    source = new AudioFileSourceSD(candidate.c_str());
-    if (source && source->isOpen()) {
-      Serial.printf("Audio: Fallback %s\n", candidate.c_str());
-      return source;
-    }
-    delete source;
-  }
-
-  Serial.printf("Audio: Datei nicht gefunden %s\n", file_path);
-  return nullptr;
-}
 
 String sanitize_display_name(const String& file_name) {
   String base = file_name;
@@ -176,49 +135,6 @@ void save_settings() {
       "Adhan gespeichert: pfad=%s name=%s\n",
       appSettings.adhanSoundFile.c_str(),
       persistedAdhanName.c_str());
-}
-
-void stop_preview_audio_internal() {
-  if (mp3Tone) {
-    mp3Tone->stop();
-    delete mp3Tone;
-    mp3Tone = nullptr;
-  }
-  if (toneFile) {
-    delete toneFile;
-    toneFile = nullptr;
-  }
-  previewActive = false;
-  previewOptionIndex = -1;
-}
-
-bool start_audio_file(const char* file_path, int option_index) {
-  if (!sdCardOk || out == nullptr || file_path == nullptr || file_path[0] == '\0') {
-    Serial.println("Audio: Start nicht moeglich (SD/out/Pfad)");
-    stop_preview_audio_internal();
-    return false;
-  }
-
-  stop_preview_audio_internal();
-  toneFile = open_audio_file(file_path);
-  if (toneFile == nullptr) {
-    return false;
-  }
-
-  mp3Tone = new AudioGeneratorMP3();
-  if (!mp3Tone->begin(toneFile, out)) {
-    Serial.printf("Audio: MP3 Start fehlgeschlagen %s\n", file_path);
-    delete mp3Tone;
-    mp3Tone = nullptr;
-    delete toneFile;
-    toneFile = nullptr;
-    return false;
-  }
-
-  previewActive = true;
-  previewOptionIndex = option_index;
-  update_audio_gain();
-  return true;
 }
 
 int find_selected_adhan_index() {
@@ -436,33 +352,23 @@ void update_volume_display() {
 }
 
 void update_audio_gain() {
-  if (out != nullptr) {
-    out->SetGain(appSettings.volumeLevel / 10.0f);
-  }
+  audio_manager_apply_volume(appSettings.volumeLevel);
 }
 
 void handleToneTick() {
-  if (mp3Tone) {
-    if (mp3Tone->isRunning()) {
-      if (!mp3Tone->loop()) {
-        stop_preview_audio_internal();
-      }
-    } else {
-      stop_preview_audio_internal();
-    }
-  }
+  // Audio wird global im Audio-Manager getaktet.
 }
 
 void playTone() {
   if (currentScreen != SCREEN_SETTINGS) return;
-  if (start_audio_file("/beep.mp3", -1)) return;
+  if (audio_manager_play_preview("/beep.mp3")) return;
   if (appSettings.adhanSoundFile.length() > 0) {
-    start_audio_file(appSettings.adhanSoundFile.c_str(), -1);
+    audio_manager_play_preview(appSettings.adhanSoundFile.c_str());
   }
 }
 
 void settings_screen_stop_preview() {
-  stop_preview_audio_internal();
+  audio_manager_stop_source(AUDIO_SOURCE_ADHAN_PREVIEW);
 }
 
 void reset_app(lv_event_t* e) {
@@ -485,7 +391,8 @@ bool settings_screen_is_selected_adhan_option(size_t index) {
 }
 
 bool settings_screen_is_previewing_option(size_t index) {
-  return previewActive && previewOptionIndex == static_cast<int>(index);
+  return index < adhanOptionCount && audio_manager_is_source_active(AUDIO_SOURCE_ADHAN_PREVIEW) &&
+         adhanOptions[index].filePath == audio_manager_current_path();
 }
 
 bool settings_screen_select_adhan_option(size_t index) {
@@ -504,7 +411,7 @@ bool settings_screen_play_preview_for_option(size_t index) {
     return false;
   }
   Serial.printf("Audio: Vorschau fuer %s\n", adhanOptions[index].filePath.c_str());
-  return start_audio_file(adhanOptions[index].filePath.c_str(), static_cast<int>(index));
+  return audio_manager_play_preview(adhanOptions[index].filePath.c_str());
 }
 
 void settings_screen_reload_adhan_files() {

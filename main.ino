@@ -4,6 +4,7 @@
 #include <XPT2046_Touchscreen.h>
 
 #include "app_state.h"
+#include "audio_manager.h"
 #include "start_screen_logic.h"
 #include "home_screen_logic.h"
 #include "prayers_screen_logic.h"
@@ -197,6 +198,8 @@ void loop() {
       adhan_select_screen_loop();
       break;
   }
+
+  audio_manager_loop();
 
   lv_tick_inc(5);
   lv_timer_handler();

@@ -1,6 +1,8 @@
 #include "home_screen_logic.h"
 
+#include "audio_manager.h"
 #include "app_state.h"
+#include "azan_screen_logic.h"
 #include "home_screen_ui.h"
 #include "ui.h"
 
@@ -30,7 +32,6 @@ void home_screen_init() {
     drawDate();
   }
 
-  playHomeTone();
   updateStatusIcons();
   initialized = true;
 }
@@ -104,10 +105,8 @@ void checkAdhanLogic() {
 
     if (diff >= 0 && diff < 10 && lastTriggeredPrayer != i) {
       lastTriggeredPrayer = i;
-      if (!isPlaying) {
-        nextPrayerIndex = i;
-        changeScreen(SCREEN_AZAN);
-      }
+      nextPrayerIndex = i;
+      startAdhan();
     }
   }
 }
@@ -173,40 +172,9 @@ void drawNextPrayer() {
 }
 
 void handleHomeToneTick() {
-  if (systemStartAudioMp3 && systemStartAudioMp3->isRunning()) {
-    if (!systemStartAudioMp3->loop()) {
-      systemStartAudioMp3->stop();
-      delete systemStartAudioMp3;
-      systemStartAudioMp3 = nullptr;
-
-      delete systemStartAudioFile;
-      systemStartAudioFile = nullptr;
-    }
-  }
+  // Audio wird global im Audio-Manager getaktet.
 }
 
 void playHomeTone() {
-  if (!sdCardOk || out == nullptr) {
-    return;
-  }
-
-  if (systemStartAudioMp3) {
-    systemStartAudioMp3->stop();
-    delete systemStartAudioMp3;
-    systemStartAudioMp3 = nullptr;
-  }
-  if (systemStartAudioFile) {
-    delete systemStartAudioFile;
-    systemStartAudioFile = nullptr;
-  }
-
-  systemStartAudioFile = new AudioFileSourceSD("/system_start.mp3");
-  systemStartAudioMp3 = new AudioGeneratorMP3();
-
-  if (!systemStartAudioMp3->begin(systemStartAudioFile, out)) {
-    delete systemStartAudioMp3;
-    systemStartAudioMp3 = nullptr;
-    delete systemStartAudioFile;
-    systemStartAudioFile = nullptr;
-  }
+  audio_manager_play_system_start("/system_start.mp3");
 }

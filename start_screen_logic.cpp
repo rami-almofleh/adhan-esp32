@@ -1,3 +1,4 @@
+#include "audio_manager.h"
 #include "app_state.h"
 #include "settings_screen_logic.h"
 #include "start_screen_logic.h"
@@ -6,9 +7,6 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <SD.h>
-#include <AudioFileSourceSD.h>
-#include <AudioGeneratorMP3.h>
-#include <AudioOutputI2S.h>
 #include <stdio.h>
 #include <time.h>
 #include <esp_system.h>
@@ -36,6 +34,8 @@ void start_screen_init() {
 }
 
 void start_screen_loop() {
+  static bool startupTonePlayed = false;
+
   switch (currentStatus) {
     case ST_START:
       initAudio();
@@ -97,20 +97,16 @@ void start_screen_loop() {
 
     case ST_RUNNING:
       changeScreen(SCREEN_HOME);
+      if (!startupTonePlayed && sdCardOk) {
+        startupTonePlayed = audio_manager_play_system_start("/system_start.mp3");
+      }
       break;
   }
 }
 
 void initAudio() {
   updateStatus("Audio Start...");
-
-  if (!out) {
-    out = new AudioOutputI2S();
-  }
-  out->SetPinout(32, 25, 21);
-  // out->SetPinout(25, 26, 22);
-  out->begin();
-  out->SetGain(appSettings.volumeLevel / 10.0f);
+  audio_manager_init();
 }
 
 void initSD() {
@@ -122,6 +118,7 @@ void initSD() {
   hspi.begin(SD_SCK, SD_MISO, SD_MOSI, SD_CS);
   bool ok = SD.begin(SD_CS, hspi, 1000000);
   sdCardOk = ok;
+  audio_manager_on_sd_ready(ok);
   
   if (ok) {
     updateStatus("SD OK!");

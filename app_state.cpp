@@ -37,11 +37,7 @@ bool sdCardOk = false;
 AppSettings appSettings = {6, false, ""};
 AudioGeneratorMP3* mp3 = nullptr;
 AudioFileSourceSD* file = nullptr;
-AudioOutputI2S* out = nullptr;
-AudioFileSourceSD* toneFile = nullptr;
-AudioGeneratorMP3* mp3Tone = nullptr;
-AudioFileSourceSD* systemStartAudioFile = nullptr;
-AudioGeneratorMP3* systemStartAudioMp3 = nullptr;
+AudioOutput* out = nullptr;
 int nextPrayerIndex = 0;
 
 const uint8_t TOUCH_CS = 33;
