@@ -34,6 +34,7 @@ bool previewActive = false;
 int previewOptionIndex = -1;
 AdhanOption adhanOptions[kMaxAdhanFiles];
 size_t adhanOptionCount = 0;
+String persistedAdhanName = "";
 
 AudioFileSourceSD* open_audio_file(const char* file_path) {
   if (file_path == nullptr || file_path[0] == '\0') {
@@ -83,12 +84,23 @@ String sanitize_display_name(const String& file_name) {
   return base;
 }
 
-bool is_mp3_file(const String& file_name) {
-  String base_name = file_name;
-  int slash_pos = base_name.lastIndexOf('/');
+String basename_from_path(const String& file_name) {
+  String base = file_name;
+  int slash_pos = base.lastIndexOf('/');
   if (slash_pos >= 0) {
-    base_name = base_name.substring(slash_pos + 1);
+    base = base.substring(slash_pos + 1);
   }
+  return base;
+}
+
+bool equals_ignore_case(String left, String right) {
+  left.toLowerCase();
+  right.toLowerCase();
+  return left == right;
+}
+
+bool is_mp3_file(const String& file_name) {
+  String base_name = basename_from_path(file_name);
 
   if (base_name.length() == 0 || base_name.startsWith(".")) {
     return false;
@@ -154,10 +166,16 @@ bool load_adhan_directory(const char* folder_path) {
 
 void save_settings() {
   if (!preferences.begin(kPrefsNamespace, false)) return;
+  persistedAdhanName = basename_from_path(appSettings.adhanSoundFile);
   preferences.putUChar("volume", appSettings.volumeLevel);
   preferences.putBool("dark", appSettings.darkMode);
   preferences.putString("adhan_file", appSettings.adhanSoundFile.c_str());
+  preferences.putString("adhan_name", persistedAdhanName.c_str());
   preferences.end();
+  Serial.printf(
+      "Adhan gespeichert: pfad=%s name=%s\n",
+      appSettings.adhanSoundFile.c_str(),
+      persistedAdhanName.c_str());
 }
 
 void stop_preview_audio_internal() {
@@ -222,17 +240,38 @@ String selected_adhan_label() {
 
 void ensure_default_adhan_selection() {
   if (adhanOptionCount == 0) {
-    appSettings.adhanSoundFile = "";
     return;
   }
+
   for (size_t i = 0; i < adhanOptionCount; i++) {
-    if (adhanOptions[i].filePath == appSettings.adhanSoundFile) return;
+    if (adhanOptions[i].filePath == appSettings.adhanSoundFile) {
+      persistedAdhanName = basename_from_path(appSettings.adhanSoundFile);
+      return;
+    }
   }
+
+  String wanted_name = persistedAdhanName;
+  if (wanted_name.length() == 0 && appSettings.adhanSoundFile.length() > 0) {
+    wanted_name = basename_from_path(appSettings.adhanSoundFile);
+  }
+
+  if (wanted_name.length() > 0) {
+    for (size_t i = 0; i < adhanOptionCount; i++) {
+      if (equals_ignore_case(basename_from_path(adhanOptions[i].filePath), wanted_name)) {
+        appSettings.adhanSoundFile = adhanOptions[i].filePath;
+        persistedAdhanName = basename_from_path(appSettings.adhanSoundFile);
+        return;
+      }
+    }
+  }
+
   appSettings.adhanSoundFile = adhanOptions[0].filePath;
+  persistedAdhanName = basename_from_path(appSettings.adhanSoundFile);
 }
 
 void refresh_adhan_files() {
   String previous_file = appSettings.adhanSoundFile;
+  String previous_name = persistedAdhanName;
   clear_adhan_options();
 
   if (sdCardOk) {
@@ -242,9 +281,16 @@ void refresh_adhan_files() {
     sort_adhan_options();
   }
 
-  ensure_default_adhan_selection();
   adhanFilesLoaded = adhanOptionCount > 0;
   Serial.printf("Adhan Dateien gefunden: %u\n", static_cast<unsigned>(adhanOptionCount));
+
+  if (adhanOptionCount == 0) {
+    appSettings.adhanSoundFile = previous_file;
+    persistedAdhanName = previous_name;
+    return;
+  }
+
+  ensure_default_adhan_selection();
 
   if (previous_file != appSettings.adhanSoundFile) {
     Serial.printf("Adhan Default/Selection gesetzt: %s\n", appSettings.adhanSoundFile.c_str());
@@ -297,12 +343,19 @@ void load_settings() {
   appSettings.volumeLevel = 6;
   appSettings.darkMode = false;
   appSettings.adhanSoundFile = "";
+  persistedAdhanName = "";
 
   if (!preferences.begin(kPrefsNamespace, true)) return;
   appSettings.volumeLevel = preferences.getUChar("volume", 6);
   appSettings.darkMode = preferences.getBool("dark", false);
   appSettings.adhanSoundFile = preferences.getString("adhan_file", "");
+  persistedAdhanName = preferences.getString("adhan_name", "");
   preferences.end();
+
+  Serial.printf(
+      "Adhan geladen: pfad=%s name=%s\n",
+      appSettings.adhanSoundFile.c_str(),
+      persistedAdhanName.c_str());
 
   if (appSettings.volumeLevel > kMaxVolume) {
     appSettings.volumeLevel = 6;
@@ -330,7 +383,9 @@ void settings_screen_init() {
       settings_screen_open_adhan_selector);
 
   initialized = true;
-  refresh_adhan_files();
+  if (sdCardOk) {
+    refresh_adhan_files();
+  }
   sync_settings_ui();
   update_audio_gain();
 }
@@ -436,6 +491,8 @@ bool settings_screen_is_previewing_option(size_t index) {
 bool settings_screen_select_adhan_option(size_t index) {
   if (index >= adhanOptionCount) return false;
   appSettings.adhanSoundFile = adhanOptions[index].filePath;
+  persistedAdhanName = basename_from_path(appSettings.adhanSoundFile);
+  Serial.printf("Adhan ausgewaehlt: %s\n", appSettings.adhanSoundFile.c_str());
   save_settings();
   sync_settings_ui();
   return true;
@@ -466,6 +523,7 @@ String settings_screen_get_effective_adhan_file() {
 
   if (adhanOptionCount > 0) {
     appSettings.adhanSoundFile = adhanOptions[0].filePath;
+    persistedAdhanName = basename_from_path(appSettings.adhanSoundFile);
     save_settings();
     Serial.printf("Adhan Fallback auf erste Datei: %s\n", appSettings.adhanSoundFile.c_str());
     return appSettings.adhanSoundFile;
